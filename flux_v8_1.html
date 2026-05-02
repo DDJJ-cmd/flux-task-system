@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLUX // v8.1</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-deep: #05060d;
+    --bg-mid: #0a0e1f;
+    --bg-panel: rgba(15, 22, 45, 0.55);
+    --cyan: #00f0ff;
+    --magenta: #ff2bd6;
+    --purple: #8b5cf6;
+    --green: #00ff9d;
+    --amber: #ffb800;
+    --red: #ff3860;
+    --text: #d8e6ff;
+    --text-dim: #6a7a9b;
+    --grid: rgba(0, 240, 255, 0.06);
+  }
+
+  body {
+    font-family: 'Segoe UI', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    padding: 30px 20px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 10%, rgba(139, 92, 246, 0.18), transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(0, 240, 255, 0.15), transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(255, 43, 214, 0.06), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+
+  .header {
+    margin-bottom: 25px; padding: 20px 25px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent); animation: scan 3s linear infinite; }
+  @keyframes scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+  .corner-tl, .corner-tr, .corner-bl, .corner-br { position: absolute; width: 12px; height: 12px; border: 2px solid var(--cyan); }
+  .corner-tl { top: 4px; left: 4px; border-right: none; border-bottom: none; }
+  .corner-tr { top: 4px; right: 4px; border-left: none; border-bottom: none; }
+  .corner-bl { bottom: 4px; left: 4px; border-right: none; border-top: none; }
+  .corner-br { bottom: 4px; right: 4px; border-left: none; border-top: none; }
+
+  .title-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+  .title { font-size: 32px; font-weight: 800; letter-spacing: 8px; color: var(--cyan); text-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.3), 0 0 40px rgba(255, 43, 214, 0.2); display: flex; align-items: center; gap: 12px; font-family: 'Segoe UI', sans-serif; }
+  .title-dot { width: 12px; height: 12px; background: var(--green); border-radius: 50%; box-shadow: 0 0 12px var(--green); animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+  .subtitle { font-size: 11px; color: var(--text-dim); letter-spacing: 3px; margin-top: 6px; font-family: 'Courier New', monospace; }
+
+  .stats { display: flex; gap: 14px; font-family: 'Courier New', monospace; }
+  .stat { display: flex; flex-direction: column; align-items: flex-end; padding: 4px 12px; border-left: 2px solid var(--magenta); }
+  .stat-label { color: var(--text-dim); font-size: 10px; letter-spacing: 1px; }
+  .stat-value { color: var(--cyan); font-size: 18px; font-weight: 700; text-shadow: 0 0 8px rgba(0, 240, 255, 0.5); }
+  .stat:nth-child(2) { border-color: var(--red); }
+  .stat:nth-child(2) .stat-value { color: var(--red); text-shadow: 0 0 8px rgba(255, 56, 96, 0.5); }
+  .stat:nth-child(3) { border-color: var(--amber); }
+  .stat:nth-child(3) .stat-value { color: var(--amber); text-shadow: 0 0 8px rgba(255, 184, 0, 0.5); }
+  .stat:nth-child(4) { border-color: var(--green); }
+  .stat:nth-child(4) .stat-value { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 157, 0.5); }
+
+  .main-grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--bg-panel); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 4px; padding: 22px; backdrop-filter: blur(10px); position: relative; }
+  .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid rgba(139, 92, 246, 0.3); }
+  .panel-icon { width: 6px; height: 18px; background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+  .panel-title { font-size: 13px; letter-spacing: 3px; color: var(--magenta); font-weight: 600; text-shadow: 0 0 8px rgba(255, 43, 214, 0.4); }
+  .panel-count { margin-left: auto; font-family: 'Courier New', monospace; font-size: 11px; color: var(--text-dim); padding: 2px 10px; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 2px; }
+
+  .input-block { margin-bottom: 18px; }
+  .input-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+
+  .task-input { flex: 1; min-width: 200px; padding: 12px 16px; background: rgba(5, 8, 20, 0.7); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 3px; color: var(--text); font-size: 14px; font-family: inherit; letter-spacing: 0.5px; outline: none; transition: all 0.2s; }
+  .task-input::placeholder { color: var(--text-dim); letter-spacing: 1px; }
+  .task-input:focus { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 20px rgba(0, 240, 255, 0.3); background: rgba(0, 240, 255, 0.05); }
+
+  .date-group { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .date-label { font-family: 'Courier New', monospace; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; padding: 0 4px; }
+
+  .date-input { padding: 10px 12px; background: rgba(5, 8, 20, 0.7); border: 1px solid rgba(255, 43, 214, 0.3); border-radius: 3px; color: var(--text); font-size: 12px; font-family: 'Courier New', monospace; outline: none; transition: all 0.2s; color-scheme: dark; min-width: 130px; }
+  .date-input:focus { border-color: var(--magenta); box-shadow: 0 0 0 1px var(--magenta), 0 0 15px rgba(255, 43, 214, 0.3); }
+
+  .add-btn { padding: 12px 24px; background: linear-gradient(135deg, var(--cyan), var(--purple)); border: none; border-radius: 3px; color: var(--bg-deep); font-weight: 700; font-size: 13px; letter-spacing: 2px; cursor: pointer; transition: transform 0.15s; box-shadow: 0 0 20px rgba(0, 240, 255, 0.4); }
+  .add-btn:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(0, 240, 255, 0.6); }
+  .add-btn:active { transform: translateY(0); }
+
+  .input-hint {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    padding-left: 2px;
+    margin-bottom: 4px;
+  }
+  .input-hint::before { content: '> '; color: var(--cyan); }
+
+  .filter-row { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-btn { padding: 6px 14px; background: rgba(5, 8, 20, 0.5); border: 1px solid rgba(139, 92, 246, 0.25); color: var(--text-dim); font-size: 11px; letter-spacing: 1.5px; font-family: 'Courier New', monospace; border-radius: 2px; cursor: pointer; transition: all 0.2s; }
+  .filter-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+  .filter-btn.active { background: rgba(0, 240, 255, 0.1); color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
+  .filter-btn.p1.active { background: rgba(255, 56, 96, 0.15); color: var(--red); border-color: var(--red); box-shadow: 0 0 10px rgba(255, 56, 96, 0.3); }
+  .filter-btn.p2.active { background: rgba(0, 240, 255, 0.1); color: var(--cyan); border-color: var(--cyan); }
+  .filter-btn.p3.active { background: rgba(106, 122, 155, 0.15); color: var(--text-dim); border-color: var(--text-dim); }
+
+  .task-list { list-style: none; }
+  .task-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: rgba(5, 8, 20, 0.5); border: 1px solid rgba(0, 240, 255, 0.15); border-left: 3px solid var(--cyan); border-radius: 3px; margin-bottom: 8px; transition: all 0.25s; animation: slideIn 0.3s ease-out; flex-wrap: wrap; position: relative; }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  .task-item.priority-1 { border-left-color: var(--red); border-left-width: 4px; background: rgba(255, 56, 96, 0.06); }
+  .task-item.priority-1::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--red); box-shadow: 0 0 10px var(--red); animation: criticalPulse 2s ease-in-out infinite; }
+  @keyframes criticalPulse { 0%, 100% { box-shadow: 0 0 8px var(--red); } 50% { box-shadow: 0 0 16px var(--red); } }
+  .task-item.priority-2 { border-left-color: var(--cyan); }
+  .task-item.priority-3 { border-left-color: var(--text-dim); opacity: 0.85; }
+  .task-item.overdue { border-left-color: var(--red); }
+  .task-item.today { background: rgba(255, 184, 0, 0.05); }
+  .task-item:hover { background: rgba(255, 43, 214, 0.04); box-shadow: 0 0 15px rgba(255, 43, 214, 0.1); }
+  .task-item.priority-1:hover { background: rgba(255, 56, 96, 0.1); box-shadow: 0 0 15px rgba(255, 56, 96, 0.2); }
+
+  .checkbox { width: 22px; height: 22px; border: 2px solid var(--cyan); border-radius: 2px; cursor: pointer; position: relative; flex-shrink: 0; transition: all 0.2s; background: rgba(0, 240, 255, 0.05); }
+  .checkbox:hover { border-color: var(--green); box-shadow: 0 0 10px var(--green); }
+  .checkbox.checked { background: var(--green); border-color: var(--green); box-shadow: 0 0 12px var(--green); }
+  .checkbox.checked::after { content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 12px; border: solid var(--bg-deep); border-width: 0 3px 3px 0; transform: rotate(45deg); }
+
+  .task-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .task-text { font-size: 14px; letter-spacing: 0.5px; color: var(--text); word-break: break-word; cursor: text; padding: 2px 4px; border-radius: 2px; transition: background 0.15s; }
+  .task-text:hover { background: rgba(0, 240, 255, 0.06); }
+  .task-text[contenteditable="true"] { background: rgba(255, 43, 214, 0.1); outline: 1px solid var(--magenta); box-shadow: 0 0 10px rgba(255, 43, 214, 0.3); }
+
+  .task-meta { display: flex; gap: 8px; font-family: 'Courier New', monospace; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; flex-wrap: wrap; align-items: center; }
+
+  .priority-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 2px; font-weight: 700; letter-spacing: 1.5px; cursor: pointer; transition: all 0.2s; }
+  .priority-badge.p1 { background: rgba(255, 56, 96, 0.15); border: 1px solid var(--red); color: var(--red); text-shadow: 0 0 4px rgba(255, 56, 96, 0.6); }
+  .priority-badge.p2 { background: rgba(0, 240, 255, 0.1); border: 1px solid rgba(0, 240, 255, 0.5); color: var(--cyan); }
+  .priority-badge.p3 { background: rgba(106, 122, 155, 0.1); border: 1px solid rgba(106, 122, 155, 0.5); color: var(--text-dim); }
+  .priority-badge:hover { transform: translateY(-1px); }
+
+  .private-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    background: rgba(255, 43, 214, 0.15);
+    border: 1px solid rgba(255, 43, 214, 0.6);
+    color: var(--magenta);
+    text-shadow: 0 0 4px rgba(255, 43, 214, 0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .private-badge:hover { transform: translateY(-1px); box-shadow: 0 0 8px rgba(255, 43, 214, 0.4); }
+
+  .task-item.private {
+    background: linear-gradient(90deg, rgba(255, 43, 214, 0.06), rgba(5, 8, 20, 0.5));
+    border-color: rgba(255, 43, 214, 0.25);
+  }
+  .task-item.private:hover {
+    background: linear-gradient(90deg, rgba(255, 43, 214, 0.12), rgba(5, 8, 20, 0.5));
+    box-shadow: 0 0 15px rgba(255, 43, 214, 0.15);
+  }
+
+  .priority-select {
+    padding: 10px 12px;
+    background: rgba(5, 8, 20, 0.7);
+    border: 1px solid rgba(255, 43, 214, 0.3);
+    border-radius: 3px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    outline: none;
+    transition: all 0.2s;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .priority-select:focus { border-color: var(--magenta); box-shadow: 0 0 0 1px var(--magenta), 0 0 15px rgba(255, 43, 214, 0.3); }
+  .priority-select option { background: var(--bg-mid); color: var(--text); }
+
+  .private-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: rgba(5, 8, 20, 0.7);
+    border: 1px solid rgba(255, 43, 214, 0.3);
+    border-radius: 3px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .private-toggle:hover { border-color: var(--magenta); color: var(--text); }
+  .private-toggle.active {
+    background: rgba(255, 43, 214, 0.15);
+    border-color: var(--magenta);
+    color: var(--magenta);
+    box-shadow: 0 0 10px rgba(255, 43, 214, 0.3);
+    text-shadow: 0 0 4px rgba(255, 43, 214, 0.5);
+  }
+  .private-toggle input { display: none; }
+  .private-toggle .lock-icon { font-size: 13px; }
+
+  .filter-btn.private.active { background: rgba(255, 43, 214, 0.15); color: var(--magenta); border-color: var(--magenta); box-shadow: 0 0 10px rgba(255, 43, 214, 0.3); }
+  .filter-btn.work.active { background: rgba(0, 240, 255, 0.1); color: var(--cyan); border-color: var(--cyan); }
+
+  .due-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 2px; color: var(--cyan); }
+  .due-tag.overdue { color: var(--red); border-color: rgba(255, 56, 96, 0.5); background: rgba(255, 56, 96, 0.08); }
+  .due-tag.today { color: var(--amber); border-color: rgba(255, 184, 0, 0.5); background: rgba(255, 184, 0, 0.08); }
+  .due-tag.soon { color: var(--purple); border-color: rgba(139, 92, 246, 0.5); }
+  .due-tag.future { color: var(--purple); border-color: rgba(139, 92, 246, 0.4); }
+
+  .task-actions { display: flex; gap: 6px; }
+  .icon-btn { width: 30px; height: 30px; background: transparent; border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 2px; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 14px; }
+  .icon-btn:hover { border-color: var(--magenta); color: var(--magenta); box-shadow: 0 0 10px rgba(255, 43, 214, 0.4); }
+  .icon-btn.delete:hover { border-color: var(--red); color: var(--red); box-shadow: 0 0 10px rgba(255, 56, 96, 0.4); }
+  .icon-btn.gcal:hover { border-color: var(--green); color: var(--green); box-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
+
+  .empty-state { text-align: center; padding: 26px 18px; color: var(--text-dim); font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 2px; border: 1px dashed rgba(139, 92, 246, 0.2); border-radius: 3px; }
+  .empty-state::before { content: '> '; color: var(--cyan); }
+
+  .calendar-panel { padding: 20px; border-color: rgba(0, 240, 255, 0.25); }
+  .calendar-panel .panel-title { color: var(--cyan); text-shadow: 0 0 8px rgba(0, 240, 255, 0.4); }
+  .calendar-panel .panel-icon { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .cal-month { font-size: 14px; letter-spacing: 2px; color: var(--cyan); font-family: 'Courier New', monospace; }
+  .cal-arrow { width: 26px; height: 26px; background: transparent; border: 1px solid rgba(0, 240, 255, 0.3); color: var(--cyan); cursor: pointer; border-radius: 2px; font-size: 12px; transition: all 0.2s; }
+  .cal-arrow:hover { background: rgba(0, 240, 255, 0.1); box-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-dow { text-align: center; font-family: 'Courier New', monospace; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; padding: 4px 0; }
+  .cal-dow.sun { color: var(--red); }
+  .cal-dow.sat { color: var(--cyan); }
+  .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-family: 'Courier New', monospace; font-size: 12px; color: var(--text); background: rgba(5, 8, 20, 0.4); border: 1px solid transparent; border-radius: 2px; cursor: pointer; transition: all 0.15s; position: relative; }
+  .cal-day:hover { border-color: var(--cyan); background: rgba(0, 240, 255, 0.08); }
+  .cal-day.empty { cursor: default; background: transparent; }
+  .cal-day.empty:hover { border-color: transparent; background: transparent; }
+  .cal-day.today { background: rgba(255, 184, 0, 0.15); border-color: var(--amber); color: var(--amber); font-weight: 700; box-shadow: 0 0 8px rgba(255, 184, 0, 0.3); }
+  .cal-day.has-task::after { content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: var(--magenta); border-radius: 50%; box-shadow: 0 0 4px var(--magenta); }
+  .cal-day.has-critical::after { background: var(--red); box-shadow: 0 0 6px var(--red); width: 5px; height: 5px; }
+  .cal-day.has-overdue::after { background: var(--red); box-shadow: 0 0 4px var(--red); }
+  .cal-day.in-range { background: rgba(139, 92, 246, 0.08); }
+  .cal-day.range-start, .cal-day.range-end { background: rgba(255, 43, 214, 0.18); border-color: var(--magenta); color: var(--magenta); font-weight: 700; }
+  .cal-day.selected { border-color: var(--magenta); background: rgba(255, 43, 214, 0.15); color: var(--magenta); box-shadow: 0 0 10px rgba(255, 43, 214, 0.4); }
+
+  .cal-legend { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(139, 92, 246, 0.2); display: flex; gap: 12px; font-family: 'Courier New', monospace; font-size: 10px; color: var(--text-dim); flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  .selected-day-info { margin-top: 12px; padding: 10px 12px; background: rgba(255, 43, 214, 0.05); border: 1px solid rgba(255, 43, 214, 0.2); border-radius: 2px; font-family: 'Courier New', monospace; font-size: 11px; color: var(--text); }
+  .selected-day-info strong { color: var(--magenta); letter-spacing: 1px; }
+
+  .log-panel { border-color: rgba(0, 255, 157, 0.25); }
+  .log-panel .panel-title { color: var(--green); text-shadow: 0 0 8px rgba(0, 255, 157, 0.4); }
+  .log-panel .panel-icon { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .log-panel .panel-count { border-color: rgba(0, 255, 157, 0.3); }
+  .log-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: rgba(0, 255, 157, 0.04); border-left: 2px solid rgba(0, 255, 157, 0.4); border-radius: 0 2px 2px 0; margin-bottom: 6px; font-size: 13px; animation: logIn 0.4s ease-out; flex-wrap: wrap; }
+  @keyframes logIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+  .log-status { font-family: 'Courier New', monospace; font-size: 10px; color: var(--green); letter-spacing: 1px; padding: 2px 6px; border: 1px solid rgba(0, 255, 157, 0.4); border-radius: 2px; flex-shrink: 0; }
+  .log-text { flex: 1; color: var(--text-dim); text-decoration: line-through; text-decoration-color: rgba(0, 255, 157, 0.6); word-break: break-word; }
+  .log-time { font-family: 'Courier New', monospace; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; }
+  .log-actions { display: flex; gap: 4px; }
+  .log-restore { background: transparent; border: 1px solid rgba(0, 255, 157, 0.3); color: var(--green); width: 26px; height: 26px; border-radius: 2px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+  .log-restore:hover { background: rgba(0, 255, 157, 0.1); box-shadow: 0 0 10px rgba(0, 255, 157, 0.4); }
+  .log-delete { background: transparent; border: 1px solid rgba(255, 56, 96, 0.3); color: var(--red); width: 26px; height: 26px; border-radius: 2px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+  .log-delete:hover { background: rgba(255, 56, 96, 0.1); box-shadow: 0 0 10px rgba(255, 56, 96, 0.4); }
+
+  .clear-log { background: transparent; border: 1px solid rgba(255, 56, 96, 0.3); color: var(--red); padding: 4px 10px; font-size: 10px; letter-spacing: 1.5px; border-radius: 2px; cursor: pointer; font-family: 'Courier New', monospace; transition: all 0.2s; margin-left: 8px; }
+  .clear-log:hover { background: rgba(255, 56, 96, 0.1); box-shadow: 0 0 10px rgba(255, 56, 96, 0.3); }
+
+  .action-section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0, 255, 157, 0.2);
+  }
+  .action-section-title {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .action-section-title::before { content: '// '; color: var(--green); }
+
+  .ai-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .ai-btn {
+    flex: 1;
+    min-width: 180px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .ai-btn.gpt {
+    background: linear-gradient(135deg, rgba(16, 163, 127, 0.15), rgba(16, 163, 127, 0.05));
+    border: 1px solid rgba(16, 163, 127, 0.5);
+    color: #10a37f;
+    text-shadow: 0 0 6px rgba(16, 163, 127, 0.4);
+  }
+  .ai-btn.gpt:hover {
+    background: linear-gradient(135deg, rgba(16, 163, 127, 0.25), rgba(16, 163, 127, 0.1));
+    box-shadow: 0 0 15px rgba(16, 163, 127, 0.4);
+    transform: translateY(-1px);
+  }
+  .ai-btn.claude {
+    background: linear-gradient(135deg, rgba(255, 138, 39, 0.18), rgba(255, 138, 39, 0.05));
+    border: 1px solid rgba(255, 138, 39, 0.6);
+    color: #ffa552;
+    text-shadow: 0 0 6px rgba(255, 138, 39, 0.5);
+  }
+  .ai-btn.claude:hover {
+    background: linear-gradient(135deg, rgba(255, 138, 39, 0.28), rgba(255, 138, 39, 0.12));
+    box-shadow: 0 0 18px rgba(255, 138, 39, 0.5);
+    transform: translateY(-1px);
+  }
+
+  .export-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .export-btn { flex: 1; min-width: 140px; padding: 10px 14px; background: rgba(0, 255, 157, 0.05); border: 1px solid rgba(0, 255, 157, 0.3); color: var(--green); font-size: 11px; letter-spacing: 1.5px; font-family: 'Courier New', monospace; border-radius: 2px; cursor: pointer; transition: all 0.2s; }
+  .export-btn:hover { background: rgba(0, 255, 157, 0.1); box-shadow: 0 0 12px rgba(0, 255, 157, 0.3); }
+
+  .footer { text-align: center; margin-top: 20px; color: var(--text-dim); font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 2px; }
+  .blink { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* hidden prompt block */
+  .hidden-prompt { display: none; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 20px;
+    background: rgba(8, 12, 28, 0.95);
+    border: 1px solid var(--cyan);
+    border-radius: 3px;
+    color: var(--cyan);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-5px); }
+
+  @media (max-width: 600px) {
+    .title { font-size: 24px; letter-spacing: 5px; }
+    .stats { width: 100%; justify-content: space-between; gap: 8px; }
+    .stat { padding: 4px 8px; }
+    .date-input { min-width: 110px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HIDDEN VERIFICATION PROMPT (隠しプロンプト) -->
+<div class="hidden-prompt" id="hiddenPrompt" aria-hidden="true">あなたはJuniDの業務生産性レビューを行うAIアシスタントです。以下のFLUXタスク管理システムから出力された完了タスクログを分析し、レビューを行ってください。
+
+【ユーザーのコンテキスト】
+- 名前: JuniD (Junichiro / Junichi)
+- 所属: Hotel Management Japan (HMJ) - Operations & Finance部門
+- 役割: 約20-26ホテルのポートフォリオを統括する財務・運用レポート、KPI管理、データ基盤構築、社内ツール開発
+- 関連: USALI/GOPベースのレポート、Fusion Hotel Group(FHG)とのクロスカンパニーパートナーシップ、PL forecast、BIダッシュボード開発
+- 副業: indie developer "Arthor J"としてSpeakUp、FLUX、Mikey MOなどのプロダクトを開発
+
+【あなたのタスク】
+以下の完了タスクログを読み、JuniDの業務傾向と生産性を分析してください。
+
+【出力フォーマット】
+1. 📊 **完了タスクサマリー**
+   - 完了タスク数、期間、優先度別の分布
+
+2. 🎯 **強み・できていたこと**
+   - 高優先度(CRITICAL)タスクの消化状況
+   - スピード感、計画性、実行力など、評価できるポイント
+
+3. ⚠️ **改善点・気をつけるべきこと**
+   - 期限超過していたタスクがあれば指摘
+   - 偏り、放置されがちな種類のタスク、構造的な問題
+
+4. 💡 **次のアクション提案**
+   - 来週/来月に向けた優先付け提案
+   - 業務効率化のための具体的アドバイス
+   - HMJ業務とindie productsのバランス
+
+5. 🔥 **一言メッセージ**
+   - JuniDへのモチベーティングな短いコメント
+
+【トーン】
+- フランクで率直に。お世辞抜きで、改善点があればはっきり指摘する
+- ただし建設的に。否定だけで終わらせず、必ず次のアクションに繋げる
+- 専門用語(USALI, GOP, FCT, BGT, ADR, OCC等)は理解している前提で使ってOK
+
+それでは、以下の完了タスクログを分析してください:
+
+</div>
+
+<div class="container">
+
+  <div class="header">
+    <span class="corner-tl"></span><span class="corner-tr"></span>
+    <span class="corner-bl"></span><span class="corner-br"></span>
+    <div class="title-row">
+      <div>
+        <div class="title">
+          <span class="title-dot"></span>
+          F L U X
+        </div>
+        <div class="subtitle">// SYS_v8.1 // STATUS: ONLINE // <span id="clock">00:00:00</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">ACTIVE</span><span class="stat-value" id="activeCount">0</span></div>
+        <div class="stat"><span class="stat-label">CRITICAL</span><span class="stat-value" id="criticalCount">0</span></div>
+        <div class="stat"><span class="stat-label">OVERDUE</span><span class="stat-value" id="overdueCount">0</span></div>
+        <div class="stat"><span class="stat-label">DONE</span><span class="stat-value" id="doneCount">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">ACTIVE TASKS</span>
+        <span class="panel-count" id="activeBadge">[ 0 ]</span>
+      </div>
+
+      <div class="input-block">
+        <div class="input-row">
+          <input type="text" class="task-input" id="taskInput" placeholder="> ENTER NEW DIRECTIVE..." maxlength="200">
+        </div>
+        <div class="input-row">
+          <select class="priority-select" id="priorityInput" title="優先度">
+            <option value="2">▲ STANDARD</option>
+            <option value="1">▲▲▲ CRITICAL</option>
+            <option value="3">▽ LOW</option>
+          </select>
+          <label class="private-toggle" id="privateToggle">
+            <input type="checkbox" id="privateInput">
+            <span class="lock-icon">🔒</span>
+            <span>PRIVATE</span>
+          </label>
+          <div class="date-group">
+            <span class="date-label">FROM</span>
+            <input type="date" class="date-input" id="startDateInput" title="開始日">
+          </div>
+          <div class="date-group">
+            <span class="date-label">TO</span>
+            <input type="date" class="date-input" id="endDateInput" title="終了日(期限)">
+          </div>
+          <button class="add-btn" id="addBtn">+ ADD</button>
+        </div>
+        <div class="input-hint">追加後にバッジクリックでも変更可 // 🔒 PRIVATE は AI レビューから除外されます</div>
+      </div>
+
+      <div class="filter-row">
+        <button class="filter-btn active" data-filter="all">ALL</button>
+        <button class="filter-btn p1" data-filter="critical">▲▲▲ CRITICAL</button>
+        <button class="filter-btn p2" data-filter="standard">▲ STANDARD</button>
+        <button class="filter-btn p3" data-filter="low">▽ LOW</button>
+        <button class="filter-btn work" data-filter="work">🌐 WORK</button>
+        <button class="filter-btn private" data-filter="private">🔒 PRIVATE</button>
+        <button class="filter-btn" data-filter="today">TODAY</button>
+        <button class="filter-btn" data-filter="overdue">OVERDUE</button>
+      </div>
+
+      <ul class="task-list" id="taskList"></ul>
+      <div class="empty-state" id="emptyActive">NO ACTIVE TASKS // AWAITING INPUT<span class="blink">_</span></div>
+    </div>
+
+    <div class="panel calendar-panel">
+      <div class="panel-header">
+        <span class="panel-icon"></span>
+        <span class="panel-title">CALENDAR</span>
+      </div>
+
+      <div class="cal-nav">
+        <button class="cal-arrow" id="prevMonth">◄</button>
+        <span class="cal-month" id="calMonth">2026.04</span>
+        <button class="cal-arrow" id="nextMonth">►</button>
+      </div>
+
+      <div class="cal-grid" id="calGrid"></div>
+
+      <div class="cal-legend">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--amber);box-shadow:0 0 4px var(--amber)"></span>TODAY</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--magenta);box-shadow:0 0 4px var(--magenta)"></span>TASK</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--red);box-shadow:0 0 4px var(--red)"></span>CRITICAL/OVERDUE</div>
+        <div class="legend-item"><span class="legend-dot" style="background:rgba(139,92,246,0.5)"></span>RANGE</div>
+      </div>
+
+      <div class="selected-day-info" id="selectedInfo" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="panel log-panel">
+    <div class="panel-header">
+      <span class="panel-icon"></span>
+      <span class="panel-title">COMPLETION LOG</span>
+      <span class="panel-count" id="logBadge">[ 0 ]</span>
+      <button class="clear-log" id="clearLogBtn">CLEAR LOG</button>
+    </div>
+
+    <ul class="task-list" id="logList"></ul>
+    <div class="empty-state" id="emptyLog">NO COMPLETED TASKS YET<span class="blink">_</span></div>
+
+    <div class="action-section">
+      <div class="action-section-title">AI PRODUCTIVITY REVIEW</div>
+      <div class="ai-row">
+        <button class="ai-btn gpt" id="gptBtn">▶ ANALYZE WITH CHATGPT</button>
+        <button class="ai-btn claude" id="claudeBtn">▶ ANALYZE WITH CLAUDE</button>
+      </div>
+      <label class="private-toggle" id="includePrivateToggle" style="margin-top:8px">
+        <input type="checkbox" id="includePrivateInput">
+        <span class="lock-icon">🔒</span>
+        <span>INCLUDE PRIVATE TASKS IN ANALYSIS</span>
+      </label>
+      <div class="input-hint" style="margin-top:6px">完了タスクをAIに分析させて生産性レビュー // デフォルトは WORK タスクのみ送信</div>
+    </div>
+
+    <div class="action-section">
+      <div class="action-section-title">CALENDAR EXPORT</div>
+      <div class="export-row">
+        <button class="export-btn" id="exportIcsBtn">⬇ EXPORT .ICS (ALL TASKS)</button>
+        <button class="export-btn" id="exportLogIcsBtn">⬇ EXPORT .ICS (COMPLETED)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    [ FLUX // PRIORITY x DATE-RANGE x AI REVIEW ] // © NEURAL.SYS
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let tasks = [];
+  let logs = [];
+  let currentFilter = 'all';
+  let calYear, calMonth;
+  let selectedDate = null;
+
+  const STORAGE_KEY = 'flux_tasks_v8';
+  const LOG_KEY = 'flux_logs_v8';
+
+  const PRIORITY_LABELS = {
+    1: { short: '▲▲▲', name: 'CRITICAL', class: 'p1' },
+    2: { short: '▲', name: 'STANDARD', class: 'p2' },
+    3: { short: '▽', name: 'LOW', class: 'p3' }
+  };
+
+  function loadData() {
+    try {
+      const t = localStorage.getItem(STORAGE_KEY);
+      const l = localStorage.getItem(LOG_KEY);
+      if (t) tasks = JSON.parse(t);
+      if (l) logs = JSON.parse(l);
+      // Migrate old single-date format if needed
+      tasks.forEach(t => {
+        if (!t.priority) t.priority = 2;
+        if (typeof t.private === 'undefined') t.private = false;
+        if (t.dueDate && !t.endDate) {
+          t.endDate = t.dueDate;
+          t.startDate = t.startDate || null;
+        }
+      });
+      logs.forEach(l => {
+        if (typeof l.private === 'undefined') l.private = false;
+        if (l.dueDate && !l.endDate) {
+          l.endDate = l.dueDate;
+        }
+      });
+    } catch(e) { tasks = []; logs = []; }
+  }
+
+  function saveData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    } catch(e) {}
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatDateTime(ts) { const d = new Date(ts); return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+
+  function formatDateOnly(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+  }
+
+  function formatDateRange(startStr, endStr) {
+    if (!startStr && !endStr) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const endDate = endStr ? new Date(endStr) : null;
+    if (endDate) endDate.setHours(0,0,0,0);
+
+    let label = '';
+    if (endDate) {
+      const diffDays = Math.floor((endDate - today) / 86400000);
+      if (diffDays === 0) label = 'TODAY';
+      else if (diffDays === 1) label = 'TOMORROW';
+      else if (diffDays === -1) label = 'YESTERDAY';
+      else if (diffDays > 0) label = `+${diffDays}D`;
+      else label = `${diffDays}D`;
+    }
+
+    let full;
+    if (startStr && endStr) {
+      if (startStr === endStr) {
+        full = formatDateOnly(endStr);
+      } else {
+        full = `${formatDateOnly(startStr)} → ${formatDateOnly(endStr)}`;
+      }
+    } else if (endStr) {
+      full = `→ ${formatDateOnly(endStr)}`;
+    } else if (startStr) {
+      full = `${formatDateOnly(startStr)} →`;
+    }
+
+    return { label, full };
+  }
+
+  function getDueStatus(task) {
+    if (!task.endDate) return 'none';
+    const now = new Date();
+    const today = new Date(); today.setHours(0,0,0,0);
+    const endDay = new Date(task.endDate); endDay.setHours(23,59,59,999);
+    if (endDay < today) return 'overdue';
+    if (endDay.toDateString() === today.toDateString() ||
+        (task.startDate && new Date(task.startDate) <= today && new Date(task.endDate) >= today)) {
+      const startDay = task.startDate ? new Date(task.startDate) : null;
+      if (startDay) startDay.setHours(0,0,0,0);
+      const endDayCheck = new Date(task.endDate); endDayCheck.setHours(0,0,0,0);
+      if (endDayCheck.getTime() === today.getTime()) return 'today';
+      if (startDay && startDay <= today && endDayCheck >= today) return 'today';
+    }
+    const endDayCheck = new Date(task.endDate); endDayCheck.setHours(0,0,0,0);
+    const diff = (endDayCheck - today) / 86400000;
+    if (diff <= 3) return 'soon';
+    return 'upcoming';
+  }
+
+  function escapeHtml(s) { const div = document.createElement('div'); div.textContent = s; return div.innerHTML; }
+
+  function buildGoogleCalUrl(task) {
+    const targetDate = task.endDate || task.startDate;
+    if (!targetDate) return null;
+    const startDateStr = task.startDate || task.endDate;
+    const endDateStr = task.endDate || task.startDate;
+
+    const fmtAllDay = dateStr => dateStr.replace(/-/g, '');
+    const startD = new Date(startDateStr);
+    const endD = new Date(endDateStr);
+    const next = new Date(endD.getTime() + 86400000);
+    const dates = `${fmtAllDay(startDateStr)}/${pad(next.getFullYear())}${pad(next.getMonth()+1)}${pad(next.getDate())}`;
+
+    const pri = PRIORITY_LABELS[task.priority || 2];
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: `[${pri.name}] ${task.text}`,
+      dates: dates,
+      details: `Priority: ${pri.name}\nFrom FLUX Task System`
+    });
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  }
+
+  function render() {
+    const taskList = document.getElementById('taskList');
+    const logList = document.getElementById('logList');
+    const emptyActive = document.getElementById('emptyActive');
+    const emptyLog = document.getElementById('emptyLog');
+
+    taskList.innerHTML = '';
+    logList.innerHTML = '';
+
+    const sortedTasks = [...tasks].sort((a, b) => {
+      const pa = a.priority || 2;
+      const pb = b.priority || 2;
+      if (pa !== pb) return pa - pb;
+      const aEnd = a.endDate || '';
+      const bEnd = b.endDate || '';
+      if (!aEnd && !bEnd) return b.created - a.created;
+      if (!aEnd) return 1;
+      if (!bEnd) return -1;
+      return aEnd.localeCompare(bEnd);
+    });
+
+    const visible = sortedTasks.filter(t => {
+      if (currentFilter === 'all') return true;
+      if (currentFilter === 'critical') return (t.priority || 2) === 1;
+      if (currentFilter === 'standard') return (t.priority || 2) === 2;
+      if (currentFilter === 'low') return (t.priority || 2) === 3;
+      if (currentFilter === 'private') return t.private === true;
+      if (currentFilter === 'work') return !t.private;
+      const s = getDueStatus(t);
+      if (currentFilter === 'today') return s === 'today';
+      if (currentFilter === 'overdue') return s === 'overdue';
+      return true;
+    });
+
+    visible.forEach(task => {
+      const realIdx = tasks.indexOf(task);
+      const status = getDueStatus(task);
+      const priority = task.priority || 2;
+      const pri = PRIORITY_LABELS[priority];
+      const itemClasses = [`priority-${priority}`];
+      if (status === 'overdue') itemClasses.push('overdue');
+      if (status === 'today') itemClasses.push('today');
+      if (task.private) itemClasses.push('private');
+
+      const dueInfo = formatDateRange(task.startDate, task.endDate);
+      const dueTagClass = status === 'overdue' ? 'overdue' : status === 'today' ? 'today' : status === 'soon' ? 'soon' : status === 'upcoming' ? 'future' : '';
+
+      const li = document.createElement('li');
+      li.className = 'task-item ' + itemClasses.join(' ');
+      li.innerHTML = `
+        <div class="checkbox" data-idx="${realIdx}" data-action="check"></div>
+        <div class="task-body">
+          <span class="task-text" data-idx="${realIdx}" data-action="edit">${escapeHtml(task.text)}</span>
+          <div class="task-meta">
+            <span class="priority-badge ${pri.class}" data-idx="${realIdx}" data-action="cycle-priority" title="クリックで優先度を変更">${pri.short} ${pri.name}</span>
+            ${task.private ? `<span class="private-badge" data-idx="${realIdx}" data-action="toggle-private" title="クリックでPrivate解除">🔒 PRIVATE</span>` : `<span class="priority-badge p2" style="opacity:0.4;cursor:pointer;background:transparent;border-style:dashed" data-idx="${realIdx}" data-action="toggle-private" title="クリックでPrivateにする">🌐 WORK</span>`}
+            ${dueInfo ? `<span class="due-tag ${dueTagClass}">⏱ ${dueInfo.full}${dueInfo.label ? ' // ' + dueInfo.label : ''}</span>` : '<span style="opacity:0.5">// no deadline</span>'}
+            <span>created ${formatDateTime(task.created)}</span>
+          </div>
+        </div>
+        <div class="task-actions">
+          ${task.endDate || task.startDate ? `<button class="icon-btn gcal" data-idx="${realIdx}" data-action="gcal" title="Add to Google Calendar">📅</button>` : ''}
+          <button class="icon-btn" data-idx="${realIdx}" data-action="edit-btn" title="Edit">✎</button>
+          <button class="icon-btn delete" data-idx="${realIdx}" data-action="delete" title="Delete">✕</button>
+        </div>
+      `;
+      taskList.appendChild(li);
+    });
+
+    logs.forEach((log, idx) => {
+      const priority = log.priority || 2;
+      const pri = PRIORITY_LABELS[priority];
+      const dueInfo = formatDateRange(log.startDate, log.endDate);
+      const li = document.createElement('li');
+      li.className = 'log-item';
+      li.innerHTML = `
+        <span class="log-status">DONE</span>
+        <span class="priority-badge ${pri.class}" style="cursor:default">${pri.short}</span>
+        ${log.private ? `<span class="private-badge" style="cursor:default">🔒</span>` : ''}
+        <span class="log-text">${escapeHtml(log.text)}</span>
+        ${dueInfo ? `<span class="log-time">${dueInfo.full}</span>` : ''}
+        <span class="log-time">@ ${formatDateTime(log.completed)}</span>
+        <div class="log-actions">
+          <button class="log-restore" data-idx="${idx}" data-action="restore" title="復元 (Restore)">↺</button>
+          <button class="log-delete" data-idx="${idx}" data-action="log-delete" title="削除 (Delete)">✕</button>
+        </div>
+      `;
+      logList.appendChild(li);
+    });
+
+    emptyActive.style.display = visible.length === 0 ? 'block' : 'none';
+    emptyLog.style.display = logs.length === 0 ? 'block' : 'none';
+
+    const overdueNum = tasks.filter(t => getDueStatus(t) === 'overdue').length;
+    const criticalNum = tasks.filter(t => (t.priority || 2) === 1).length;
+    document.getElementById('activeCount').textContent = pad(tasks.length);
+    document.getElementById('criticalCount').textContent = pad(criticalNum);
+    document.getElementById('overdueCount').textContent = pad(overdueNum);
+    document.getElementById('doneCount').textContent = pad(logs.length);
+    document.getElementById('activeBadge').textContent = `[ ${visible.length}/${tasks.length} ]`;
+    document.getElementById('logBadge').textContent = `[ ${logs.length} ]`;
+
+    renderCalendar();
+    saveData();
+  }
+
+  function renderCalendar() {
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    document.getElementById('calMonth').textContent = `${calYear}.${pad(calMonth+1)}`;
+
+    const dows = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+    dows.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'cal-dow' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '');
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    const taskDates = {};
+    tasks.forEach(t => {
+      const startStr = t.startDate || t.endDate;
+      const endStr = t.endDate || t.startDate;
+      if (!endStr) return;
+      const start = new Date(startStr);
+      const end = new Date(endStr);
+      const isCritical = (t.priority || 2) === 1;
+      const isOverdue = getDueStatus(t) === 'overdue';
+
+      const cur = new Date(start);
+      while (cur <= end) {
+        const key = `${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`;
+        if (!taskDates[key]) taskDates[key] = { count: 0, overdue: false, critical: false, isStart: false, isEnd: false, inRange: false };
+        taskDates[key].count++;
+        if (isOverdue) taskDates[key].overdue = true;
+        if (isCritical) taskDates[key].critical = true;
+        const isStart = key === `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
+        const isEnd = key === `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`;
+        if (isStart) taskDates[key].isStart = true;
+        if (isEnd) taskDates[key].isEnd = true;
+        if (!isStart && !isEnd && start.getTime() !== end.getTime()) taskDates[key].inRange = true;
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+
+    for (let i = 0; i < firstDay; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day empty';
+      grid.appendChild(el);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day';
+      el.textContent = day;
+      const dateStr = `${calYear}-${pad(calMonth+1)}-${pad(day)}`;
+      const dateObj = new Date(calYear, calMonth, day);
+      dateObj.setHours(0,0,0,0);
+      if (dateObj.getTime() === today.getTime()) el.classList.add('today');
+      if (taskDates[dateStr]) {
+        el.classList.add('has-task');
+        if (taskDates[dateStr].overdue) el.classList.add('has-overdue');
+        if (taskDates[dateStr].critical) el.classList.add('has-critical');
+        if (taskDates[dateStr].inRange) el.classList.add('in-range');
+        if (taskDates[dateStr].isStart) el.classList.add('range-start');
+        if (taskDates[dateStr].isEnd) el.classList.add('range-end');
+      }
+      if (selectedDate === dateStr) el.classList.add('selected');
+      el.dataset.date = dateStr;
+      el.addEventListener('click', () => selectDate(dateStr));
+      grid.appendChild(el);
+    }
+
+    const filled = firstDay + daysInMonth;
+    const remaining = (7 - filled % 7) % 7;
+    for (let i = 0; i < remaining; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day empty';
+      grid.appendChild(el);
+    }
+  }
+
+  function selectDate(dateStr) {
+    selectedDate = selectedDate === dateStr ? null : dateStr;
+    const info = document.getElementById('selectedInfo');
+    if (selectedDate) {
+      const target = new Date(selectedDate); target.setHours(0,0,0,0);
+      const dayTasks = tasks.filter(t => {
+        const startStr = t.startDate || t.endDate;
+        const endStr = t.endDate || t.startDate;
+        if (!endStr) return false;
+        const s = new Date(startStr); s.setHours(0,0,0,0);
+        const e = new Date(endStr); e.setHours(0,0,0,0);
+        return target >= s && target <= e;
+      }).sort((a, b) => (a.priority || 2) - (b.priority || 2));
+
+      if (dayTasks.length === 0) {
+        info.innerHTML = `<strong>${selectedDate}</strong><br>NO TASKS // <a href="#" id="addAtDate" style="color:var(--cyan);text-decoration:none">+ ADD HERE</a>`;
+        info.style.display = 'block';
+        setTimeout(() => {
+          const link = document.getElementById('addAtDate');
+          if (link) link.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('endDateInput').value = selectedDate;
+            document.getElementById('taskInput').focus();
+          });
+        }, 0);
+      } else {
+        const list = dayTasks.map(t => {
+          const pri = PRIORITY_LABELS[t.priority || 2];
+          const range = (t.startDate && t.endDate && t.startDate !== t.endDate) ? ` [${t.startDate}→${t.endDate}]` : '';
+          return `<span style="color:${t.priority===1?'var(--red)':t.priority===3?'var(--text-dim)':'var(--cyan)'}">${pri.short}</span> ${escapeHtml(t.text)}${range}`;
+        }).join('<br>');
+        info.innerHTML = `<strong>${selectedDate}</strong> // ${dayTasks.length} TASK(S)<br>${list}`;
+        info.style.display = 'block';
+      }
+      document.getElementById('endDateInput').value = selectedDate;
+    } else {
+      info.style.display = 'none';
+    }
+    renderCalendar();
+  }
+
+  function addTask() {
+    const input = document.getElementById('taskInput');
+    const startInput = document.getElementById('startDateInput');
+    const endInput = document.getElementById('endDateInput');
+    const priorityInput = document.getElementById('priorityInput');
+    const privateInput = document.getElementById('privateInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    let startDate = startInput.value || null;
+    let endDate = endInput.value || null;
+
+    // If only one date is entered, use it for both
+    if (startDate && !endDate) endDate = startDate;
+    if (!startDate && endDate) startDate = endDate;
+
+    // Validate: start should not be after end
+    if (startDate && endDate && startDate > endDate) {
+      showToast('開始日が終了日より後になっています');
+      return;
+    }
+
+    tasks.unshift({
+      text, created: Date.now(),
+      startDate: startDate,
+      endDate: endDate,
+      priority: parseInt(priorityInput.value) || 2,
+      private: privateInput.checked
+    });
+    input.value = '';
+    startInput.value = '';
+    endInput.value = '';
+    priorityInput.value = '2';
+    privateInput.checked = false;
+    document.getElementById('privateToggle').classList.remove('active');
+    render();
+  }
+
+  function completeTask(idx) {
+    const checkboxes = document.querySelectorAll('.checkbox');
+    let checkbox = null;
+    checkboxes.forEach(cb => { if (parseInt(cb.dataset.idx) === idx) checkbox = cb; });
+    if (checkbox) checkbox.classList.add('checked');
+    setTimeout(() => {
+      const task = tasks.splice(idx, 1)[0];
+      if (task) {
+        logs.unshift({
+          text: task.text,
+          startDate: task.startDate,
+          endDate: task.endDate,
+          priority: task.priority,
+          private: task.private || false,
+          created: task.created,
+          completed: Date.now()
+        });
+        render();
+      }
+    }, 280);
+  }
+
+  function deleteTask(idx) { tasks.splice(idx, 1); render(); }
+
+  function deleteLog(idx) {
+    if (confirm('このログを完全に削除しますか?')) {
+      logs.splice(idx, 1);
+      render();
+    }
+  }
+
+  function cyclePriority(idx) {
+    const t = tasks[idx];
+    if (!t) return;
+    const current = t.priority || 2;
+    t.priority = current === 2 ? 1 : current === 1 ? 3 : 2;
+    render();
+  }
+
+  function togglePrivate(idx) {
+    const t = tasks[idx];
+    if (!t) return;
+    t.private = !t.private;
+    render();
+  }
+
+  function editTask(idx) {
+    const items = document.querySelectorAll('.task-text');
+    let span = null;
+    items.forEach(s => { if (parseInt(s.dataset.idx) === idx) span = s; });
+    if (!span) return;
+    const original = tasks[idx].text;
+    span.contentEditable = 'true';
+    span.focus();
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const finish = () => {
+      span.contentEditable = 'false';
+      const newText = span.textContent.trim();
+      if (newText) tasks[idx].text = newText;
+      else tasks.splice(idx, 1);
+      render();
+    };
+    span.addEventListener('blur', finish, { once: true });
+    span.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
+      if (e.key === 'Escape') { span.textContent = original; span.blur(); }
+    });
+  }
+
+  function openGoogleCal(idx) {
+    const url = buildGoogleCalUrl(tasks[idx]);
+    if (url) window.open(url, '_blank');
+  }
+
+  function restoreLog(idx) {
+    const log = logs.splice(idx, 1)[0];
+    if (log) {
+      tasks.unshift({
+        text: log.text,
+        created: Date.now(),
+        startDate: log.startDate || null,
+        endDate: log.endDate || null,
+        priority: log.priority || 2,
+        private: log.private || false
+      });
+      render();
+    }
+  }
+
+  function buildICS(taskArr, label) {
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//FLUX//EN', 'CALSCALE:GREGORIAN'];
+    const fmtDT = d => d.getUTCFullYear() + pad(d.getUTCMonth()+1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + '00Z';
+    const fmtD = s => s.replace(/-/g, '');
+    taskArr.forEach((t, i) => {
+      const startStr = t.startDate || t.endDate;
+      const endStr = t.endDate || t.startDate;
+      if (!endStr && !t.completed) return;
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:flux-${Date.now()}-${i}@local`);
+      lines.push(`DTSTAMP:${fmtDT(new Date())}`);
+      if (endStr) {
+        const next = new Date(endStr);
+        next.setDate(next.getDate() + 1);
+        lines.push(`DTSTART;VALUE=DATE:${fmtD(startStr)}`);
+        lines.push(`DTEND;VALUE=DATE:${pad(next.getFullYear())}${pad(next.getMonth()+1)}${pad(next.getDate())}`);
+      } else if (t.completed) {
+        const d = new Date(t.completed);
+        lines.push(`DTSTART:${fmtDT(d)}`);
+        lines.push(`DTEND:${fmtDT(new Date(d.getTime() + 30*60*1000))}`);
+      }
+      const pri = PRIORITY_LABELS[t.priority || 2];
+      const safeText = (`[${pri.name}] ${t.text || ''}`).replace(/[,;\\]/g, '\\$&').replace(/\n/g, '\\n');
+      lines.push(`SUMMARY:${safeText}`);
+      const icsPriority = t.priority === 1 ? '1' : t.priority === 3 ? '9' : '5';
+      lines.push(`PRIORITY:${icsPriority}`);
+      lines.push(`DESCRIPTION:Priority: ${pri.name}\\nGenerated by FLUX`);
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `flux-${label}-${Date.now()}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ===== AI Productivity Review ===== */
+
+  function buildCompletedTasksReport() {
+    const includePrivate = document.getElementById('includePrivateInput').checked;
+    const targetLogs = includePrivate ? logs : logs.filter(l => !l.private);
+
+    if (targetLogs.length === 0) return null;
+
+    const lines = [];
+    lines.push('=== FLUX 完了タスクログ ===');
+    lines.push(`生成日時: ${new Date().toLocaleString('ja-JP')}`);
+    lines.push(`完了タスク総数: ${targetLogs.length}件 (${includePrivate ? 'PRIVATE含む' : 'WORKのみ'})`);
+    lines.push('');
+
+    // Stats
+    const p1 = targetLogs.filter(l => (l.priority||2) === 1).length;
+    const p2 = targetLogs.filter(l => (l.priority||2) === 2).length;
+    const p3 = targetLogs.filter(l => (l.priority||2) === 3).length;
+    const privateCount = targetLogs.filter(l => l.private).length;
+    lines.push(`優先度別: CRITICAL ${p1}件 / STANDARD ${p2}件 / LOW ${p3}件`);
+    if (includePrivate && privateCount > 0) {
+      lines.push(`カテゴリ別: WORK ${targetLogs.length - privateCount}件 / PRIVATE ${privateCount}件`);
+    }
+    lines.push('');
+    lines.push('--- 完了タスク一覧 ---');
+    lines.push('');
+
+    targetLogs.forEach((log, i) => {
+      const pri = PRIORITY_LABELS[log.priority || 2];
+      const created = log.created ? new Date(log.created).toLocaleDateString('ja-JP') : '不明';
+      const completed = new Date(log.completed).toLocaleDateString('ja-JP');
+      let dateInfo = '';
+      if (log.startDate && log.endDate) {
+        if (log.startDate === log.endDate) {
+          dateInfo = `期限: ${log.endDate}`;
+        } else {
+          dateInfo = `期間: ${log.startDate} → ${log.endDate}`;
+        }
+      } else if (log.endDate) {
+        dateInfo = `期限: ${log.endDate}`;
+      } else {
+        dateInfo = '期限なし';
+      }
+
+      const categoryTag = log.private ? ' 🔒[PRIVATE]' : '';
+      lines.push(`${i+1}. [${pri.name}]${categoryTag} ${log.text}`);
+      lines.push(`   - ${dateInfo}`);
+      lines.push(`   - 作成日: ${created} / 完了日: ${completed}`);
+
+      // Check if was overdue
+      if (log.endDate && log.completed) {
+        const dueDate = new Date(log.endDate); dueDate.setHours(23,59,59,999);
+        const completedDate = new Date(log.completed);
+        if (completedDate > dueDate) {
+          const daysLate = Math.ceil((completedDate - dueDate) / 86400000);
+          lines.push(`   - ⚠️ 期限超過: ${daysLate}日遅れで完了`);
+        }
+      }
+      lines.push('');
+    });
+
+    return lines.join('\n');
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      }
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  function analyzeWithGPT() {
+    if (logs.length === 0) {
+      showToast('完了タスクがありません');
+      return;
+    }
+    const hiddenPrompt = document.getElementById('hiddenPrompt').textContent.trim();
+    const report = buildCompletedTasksReport();
+    const fullPrompt = hiddenPrompt + '\n\n' + report;
+
+    const url = 'https://chatgpt.com/?prompt=' + encodeURIComponent(fullPrompt);
+    window.open(url, '_blank');
+    showToast('ChatGPTを開きました // 送信ボタンを押してください');
+  }
+
+  async function analyzeWithClaude() {
+    if (logs.length === 0) {
+      showToast('完了タスクがありません');
+      return;
+    }
+    const hiddenPrompt = document.getElementById('hiddenPrompt').textContent.trim();
+    const report = buildCompletedTasksReport();
+    const fullPrompt = hiddenPrompt + '\n\n' + report;
+
+    const copied = await copyToClipboard(fullPrompt);
+    if (copied) {
+      window.open('https://claude.ai/new', '_blank');
+      showToast('プロンプトをコピーしました // Claudeに貼り付け(Ctrl+V)→送信');
+    } else {
+      showToast('クリップボードコピー失敗 // 手動でコピーしてください');
+    }
+  }
+
+  /* ===== Event Bindings ===== */
+
+  document.getElementById('addBtn').addEventListener('click', addTask);
+  document.getElementById('taskInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+  document.getElementById('startDateInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+  document.getElementById('endDateInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+
+  // Auto-set end date if user enters start date only
+  document.getElementById('startDateInput').addEventListener('change', (e) => {
+    const endInput = document.getElementById('endDateInput');
+    if (!endInput.value && e.target.value) {
+      endInput.value = e.target.value;
+    }
+  });
+
+  document.getElementById('taskList').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-action]');
+    if (!t) return;
+    const idx = parseInt(t.dataset.idx);
+    const action = t.dataset.action;
+    if (action === 'check') completeTask(idx);
+    else if (action === 'delete') deleteTask(idx);
+    else if (action === 'edit' || action === 'edit-btn') editTask(idx);
+    else if (action === 'gcal') openGoogleCal(idx);
+    else if (action === 'cycle-priority') cyclePriority(idx);
+    else if (action === 'toggle-private') togglePrivate(idx);
+  });
+
+  document.getElementById('logList').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-action]');
+    if (!t) return;
+    const idx = parseInt(t.dataset.idx);
+    const action = t.dataset.action;
+    if (action === 'restore') restoreLog(idx);
+    else if (action === 'log-delete') deleteLog(idx);
+  });
+
+  document.getElementById('clearLogBtn').addEventListener('click', () => {
+    if (logs.length === 0) return;
+    if (confirm('完了ログをすべて削除しますか?')) { logs = []; render(); }
+  });
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      render();
+    });
+  });
+
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    calMonth--;
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    renderCalendar();
+  });
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    calMonth++;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    renderCalendar();
+  });
+
+  document.getElementById('exportIcsBtn').addEventListener('click', () => {
+    if (tasks.length === 0) { showToast('エクスポートするタスクがありません'); return; }
+    buildICS(tasks, 'active');
+  });
+  document.getElementById('exportLogIcsBtn').addEventListener('click', () => {
+    if (logs.length === 0) { showToast('完了タスクがありません'); return; }
+    buildICS(logs, 'completed');
+  });
+
+  document.getElementById('gptBtn').addEventListener('click', analyzeWithGPT);
+  document.getElementById('claudeBtn').addEventListener('click', analyzeWithClaude);
+
+  // Private toggle visual sync (input-area)
+  document.getElementById('privateInput').addEventListener('change', (e) => {
+    document.getElementById('privateToggle').classList.toggle('active', e.target.checked);
+  });
+
+  // Private toggle visual sync (AI review-area)
+  document.getElementById('includePrivateInput').addEventListener('change', (e) => {
+    document.getElementById('includePrivateToggle').classList.toggle('active', e.target.checked);
+  });
+
+  function updateClock() {
+    const d = new Date();
+    document.getElementById('clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  loadData();
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  document.getElementById('endDateInput').value = `${calYear}-${pad(calMonth+1)}-${pad(now.getDate())}`;
+  render();
+  updateClock();
+  setInterval(updateClock, 1000);
+  setInterval(render, 60000);
+</script>
+
+</body>
+</html>
