@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FLUX // v8.1</title>
+<title>FLUX // v9.0 // CLOUD-SYNC</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -396,9 +397,309 @@
     .stat { padding: 4px 8px; }
     .date-input { min-width: 110px; font-size: 11px; }
   }
+
+  /* ===== LOGIN SCREEN ===== */
+  .login-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-deep);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-overlay::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(139, 92, 246, 0.25), transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(0, 240, 255, 0.2), transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(255, 43, 214, 0.08), transparent 60%);
+    pointer-events: none;
+  }
+  .login-overlay::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  .login-box {
+    position: relative;
+    z-index: 1;
+    max-width: 460px;
+    width: 100%;
+    background: var(--bg-panel);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    border-radius: 4px;
+    padding: 40px 32px;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.15), 0 0 80px rgba(255, 43, 214, 0.08);
+    overflow: hidden;
+  }
+  .login-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+    animation: scan 3s linear infinite;
+  }
+
+  .login-corner {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--cyan);
+  }
+  .login-corner.tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
+  .login-corner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
+  .login-corner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
+  .login-corner.br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
+
+  .login-title {
+    text-align: center;
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: 12px;
+    color: var(--cyan);
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.7), 0 0 24px rgba(255, 43, 214, 0.3);
+    margin-bottom: 6px;
+  }
+  .login-subtitle {
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    margin-bottom: 28px;
+  }
+  .login-subtitle::before { content: '// '; color: var(--magenta); }
+  .login-subtitle::after { content: ' //'; color: var(--magenta); }
+
+  .login-status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--green);
+    letter-spacing: 2px;
+    margin-bottom: 24px;
+  }
+  .login-status-line .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .login-label {
+    display: block;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .login-label::before { content: '> '; color: var(--cyan); }
+
+  .login-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(5, 8, 20, 0.7);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 3px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    outline: none;
+    transition: all 0.2s;
+    margin-bottom: 18px;
+  }
+  .login-input::placeholder { color: var(--text-dim); }
+  .login-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan), 0 0 20px rgba(0, 240, 255, 0.3);
+    background: rgba(0, 240, 255, 0.05);
+  }
+
+  .login-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border: none;
+    border-radius: 3px;
+    color: var(--bg-deep);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+  }
+  .login-btn:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(0, 240, 255, 0.6); }
+  .login-btn:active { transform: translateY(0); }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .login-message {
+    margin-top: 18px;
+    padding: 12px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    line-height: 1.5;
+    border-left: 3px solid var(--cyan);
+    background: rgba(0, 240, 255, 0.08);
+    color: var(--text);
+    display: none;
+  }
+  .login-message.error { border-color: var(--red); background: rgba(255, 56, 96, 0.08); color: var(--red); }
+  .login-message.success { border-color: var(--green); background: rgba(0, 255, 157, 0.08); color: var(--green); }
+  .login-message.show { display: block; }
+
+  .login-info {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(139, 92, 246, 0.2);
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* loading */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-deep);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 2px solid rgba(0, 240, 255, 0.2);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  }
+
+  /* user badge & logout */
+  #userBadge { color: var(--green); margin-left: 12px; }
+  #userBadge::before { content: '// USER: '; color: var(--text-dim); }
+
+  .logout-btn {
+    margin-left: 14px;
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px solid rgba(255, 56, 96, 0.4);
+    color: var(--red);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: all 0.2s;
+    vertical-align: middle;
+  }
+  .logout-btn:hover { background: rgba(255, 56, 96, 0.1); box-shadow: 0 0 10px rgba(255, 56, 96, 0.3); }
+
+  /* sync indicator */
+  .sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+  .sync-indicator .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+  .sync-indicator.syncing .dot {
+    background: var(--amber);
+    box-shadow: 0 0 6px var(--amber);
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+  .sync-indicator.error .dot {
+    background: var(--red);
+    box-shadow: 0 0 6px var(--red);
+  }
 </style>
 </head>
 <body>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">// INITIALIZING SYSTEM //</div>
+</div>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay" style="display:none">
+  <div class="login-box">
+    <span class="login-corner tl"></span>
+    <span class="login-corner tr"></span>
+    <span class="login-corner bl"></span>
+    <span class="login-corner br"></span>
+
+    <div class="login-title">F L U X</div>
+    <div class="login-subtitle">SECURE LOGIN v9.0</div>
+
+    <div class="login-status-line">
+      <span class="dot"></span>
+      <span>SYSTEM ONLINE // AWAITING CREDENTIAL</span>
+    </div>
+
+    <label class="login-label" for="emailInput">EMAIL ADDRESS</label>
+    <input type="email" class="login-input" id="emailInput" placeholder="your.email@example.com" autocomplete="email">
+
+    <button class="login-btn" id="sendMagicBtn">▶ SEND MAGIC LINK</button>
+
+    <div class="login-message" id="loginMessage"></div>
+
+    <div class="login-info">
+      パスワード不要 // メールアドレスにマジックリンクを送信<br>
+      リンクをクリックするだけで自動ログイン<br>
+      [ POWERED BY SUPABASE // TOKYO REGION ]
+    </div>
+  </div>
+</div>
 
 <!-- HIDDEN VERIFICATION PROMPT (隠しプロンプト) -->
 <div class="hidden-prompt" id="hiddenPrompt" aria-hidden="true">あなたはJuniDの業務生産性レビューを行うAIアシスタントです。以下のFLUXタスク管理システムから出力された完了タスクログを分析し、レビューを行ってください。
@@ -442,7 +743,7 @@
 
 </div>
 
-<div class="container">
+<div class="container" id="mainContainer" style="display:none">
 
   <div class="header">
     <span class="corner-tl"></span><span class="corner-tr"></span>
@@ -453,7 +754,7 @@
           <span class="title-dot"></span>
           F L U X
         </div>
-        <div class="subtitle">// SYS_v8.1 // STATUS: ONLINE // <span id="clock">00:00:00</span></div>
+        <div class="subtitle">// SYS_v9.0 // CLOUD-SYNC // <span id="clock">00:00:00</span> <span id="userBadge"></span><span class="sync-indicator" id="syncIndicator"><span class="dot"></span><span id="syncStatus">SYNCED</span></span><button class="logout-btn" id="logoutBtn">LOGOUT</button></div>
       </div>
       <div class="stats">
         <div class="stat"><span class="stat-label">ACTIVE</span><span class="stat-value" id="activeCount">0</span></div>
@@ -583,14 +884,27 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  // ============================================
+  // SUPABASE CONFIGURATION
+  // ============================================
+  const SUPABASE_URL = 'https://ereldsuphrxdqmuhbcnj.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_OLqJNbsG7lN_DuceNNARhA_NWMKXUyq';
+
+  const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+
+  let currentUser = null;
   let tasks = [];
   let logs = [];
   let currentFilter = 'all';
   let calYear, calMonth;
   let selectedDate = null;
-
-  const STORAGE_KEY = 'flux_tasks_v8';
-  const LOG_KEY = 'flux_logs_v8';
+  let realtimeChannel = null;
 
   const PRIORITY_LABELS = {
     1: { short: '▲▲▲', name: 'CRITICAL', class: 'p1' },
@@ -598,35 +912,301 @@
     3: { short: '▽', name: 'LOW', class: 'p3' }
   };
 
-  function loadData() {
-    try {
-      const t = localStorage.getItem(STORAGE_KEY);
-      const l = localStorage.getItem(LOG_KEY);
-      if (t) tasks = JSON.parse(t);
-      if (l) logs = JSON.parse(l);
-      // Migrate old single-date format if needed
-      tasks.forEach(t => {
-        if (!t.priority) t.priority = 2;
-        if (typeof t.private === 'undefined') t.private = false;
-        if (t.dueDate && !t.endDate) {
-          t.endDate = t.dueDate;
-          t.startDate = t.startDate || null;
-        }
-      });
-      logs.forEach(l => {
-        if (typeof l.private === 'undefined') l.private = false;
-        if (l.dueDate && !l.endDate) {
-          l.endDate = l.dueDate;
-        }
-      });
-    } catch(e) { tasks = []; logs = []; }
+  // ============================================
+  // SYNC STATUS HELPERS
+  // ============================================
+  function setSyncStatus(status) {
+    const indicator = document.getElementById('syncIndicator');
+    const text = document.getElementById('syncStatus');
+    indicator.classList.remove('syncing', 'error');
+    if (status === 'syncing') {
+      indicator.classList.add('syncing');
+      text.textContent = 'SYNCING...';
+    } else if (status === 'error') {
+      indicator.classList.add('error');
+      text.textContent = 'SYNC ERROR';
+    } else {
+      text.textContent = 'SYNCED';
+    }
   }
 
-  function saveData() {
+  // ============================================
+  // AUTH FUNCTIONS
+  // ============================================
+  async function checkAuth() {
+    const { data: { session } } = await db.auth.getSession();
+    if (session && session.user) {
+      currentUser = session.user;
+      await onAuthSuccess();
+    } else {
+      showLoginScreen();
+    }
+  }
+
+  function showLoginScreen() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('mainContainer').style.display = 'none';
+  }
+
+  async function onAuthSuccess() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('mainContainer').style.display = 'block';
+
+    // Show user email (truncated)
+    const email = currentUser.email || '';
+    const shortEmail = email.length > 20 ? email.substring(0, 17) + '...' : email;
+    document.getElementById('userBadge').textContent = shortEmail;
+
+    // Load data from Supabase
+    await loadFromSupabase();
+
+    // Setup realtime subscription
+    setupRealtimeSync();
+
+    // Render
+    const now = new Date();
+    calYear = now.getFullYear();
+    calMonth = now.getMonth();
+    document.getElementById('endDateInput').value = `${calYear}-${pad(calMonth+1)}-${pad(now.getDate())}`;
+    render();
+    updateClock();
+    setInterval(updateClock, 1000);
+    setInterval(render, 60000);
+  }
+
+  async function sendMagicLink() {
+    const emailInput = document.getElementById('emailInput');
+    const messageBox = document.getElementById('loginMessage');
+    const sendBtn = document.getElementById('sendMagicBtn');
+    const email = emailInput.value.trim();
+
+    if (!email || !email.includes('@')) {
+      messageBox.className = 'login-message error show';
+      messageBox.textContent = '> ERROR: 有効なメールアドレスを入力してください';
+      return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = '▶ SENDING...';
+    messageBox.className = 'login-message show';
+    messageBox.textContent = '> TRANSMITTING SECURE LINK...';
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-      localStorage.setItem(LOG_KEY, JSON.stringify(logs));
-    } catch(e) {}
+      const { error } = await db.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: window.location.href.split('#')[0].split('?')[0]
+        }
+      });
+
+      if (error) throw error;
+
+      messageBox.className = 'login-message success show';
+      messageBox.innerHTML = '> ✓ MAGIC LINK SENT<br>> ' + email + ' のメールを確認してください<br>> リンクをクリックするとログインします';
+      sendBtn.textContent = '▶ LINK SENT';
+    } catch (err) {
+      console.error('Auth error:', err);
+      messageBox.className = 'login-message error show';
+      messageBox.textContent = '> ERROR: ' + (err.message || 'Magic Link 送信に失敗しました');
+      sendBtn.disabled = false;
+      sendBtn.textContent = '▶ SEND MAGIC LINK';
+    }
+  }
+
+  async function logout() {
+    if (!confirm('ログアウトしますか?')) return;
+    if (realtimeChannel) {
+      await db.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+    await db.auth.signOut();
+    currentUser = null;
+    tasks = [];
+    logs = [];
+    location.reload();
+  }
+
+  // ============================================
+  // SUPABASE DATA FUNCTIONS
+  // ============================================
+  async function loadFromSupabase() {
+    setSyncStatus('syncing');
+    try {
+      const [tasksRes, logsRes] = await Promise.all([
+        db.from('tasks').select('*').order('created_at', { ascending: false }),
+        db.from('logs').select('*').order('completed_at', { ascending: false })
+      ]);
+
+      if (tasksRes.error) throw tasksRes.error;
+      if (logsRes.error) throw logsRes.error;
+
+      // Map DB columns to app format
+      tasks = (tasksRes.data || []).map(dbToTask);
+      logs = (logsRes.data || []).map(dbToLog);
+
+      setSyncStatus('synced');
+    } catch (err) {
+      console.error('Load error:', err);
+      setSyncStatus('error');
+      showToast('データ読み込みエラー: ' + err.message);
+    }
+  }
+
+  function dbToTask(row) {
+    return {
+      id: row.id,
+      text: row.text,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      priority: row.priority || 2,
+      private: row.is_private || false,
+      created: new Date(row.created_at).getTime()
+    };
+  }
+
+  function dbToLog(row) {
+    return {
+      id: row.id,
+      text: row.text,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      priority: row.priority || 2,
+      private: row.is_private || false,
+      created: row.task_created_at ? new Date(row.task_created_at).getTime() : null,
+      completed: new Date(row.completed_at).getTime()
+    };
+  }
+
+  function setupRealtimeSync() {
+    if (realtimeChannel) return;
+    realtimeChannel = db
+      .channel('flux-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, async () => {
+        await loadFromSupabase();
+        render();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logs' }, async () => {
+        await loadFromSupabase();
+        render();
+      })
+      .subscribe();
+  }
+
+  // ============================================
+  // SAVE FUNCTIONS (replace localStorage)
+  // ============================================
+  async function dbInsertTask(task) {
+    setSyncStatus('syncing');
+    try {
+      const { data, error } = await db.from('tasks').insert({
+        user_id: currentUser.id,
+        text: task.text,
+        start_date: task.startDate || null,
+        end_date: task.endDate || null,
+        priority: task.priority || 2,
+        is_private: task.private || false
+      }).select().single();
+      if (error) throw error;
+      setSyncStatus('synced');
+      return dbToTask(data);
+    } catch (err) {
+      console.error('Insert task error:', err);
+      setSyncStatus('error');
+      showToast('保存エラー: ' + err.message);
+      return null;
+    }
+  }
+
+  async function dbUpdateTask(taskId, updates) {
+    setSyncStatus('syncing');
+    try {
+      const dbUpdates = {};
+      if ('text' in updates) dbUpdates.text = updates.text;
+      if ('startDate' in updates) dbUpdates.start_date = updates.startDate;
+      if ('endDate' in updates) dbUpdates.end_date = updates.endDate;
+      if ('priority' in updates) dbUpdates.priority = updates.priority;
+      if ('private' in updates) dbUpdates.is_private = updates.private;
+
+      const { error } = await db.from('tasks').update(dbUpdates).eq('id', taskId);
+      if (error) throw error;
+      setSyncStatus('synced');
+      return true;
+    } catch (err) {
+      console.error('Update task error:', err);
+      setSyncStatus('error');
+      showToast('更新エラー: ' + err.message);
+      return false;
+    }
+  }
+
+  async function dbDeleteTask(taskId) {
+    setSyncStatus('syncing');
+    try {
+      const { error } = await db.from('tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      setSyncStatus('synced');
+      return true;
+    } catch (err) {
+      console.error('Delete task error:', err);
+      setSyncStatus('error');
+      showToast('削除エラー: ' + err.message);
+      return false;
+    }
+  }
+
+  async function dbInsertLog(task) {
+    setSyncStatus('syncing');
+    try {
+      const { data, error } = await db.from('logs').insert({
+        user_id: currentUser.id,
+        text: task.text,
+        start_date: task.startDate || null,
+        end_date: task.endDate || null,
+        priority: task.priority || 2,
+        is_private: task.private || false,
+        task_created_at: task.created ? new Date(task.created).toISOString() : null
+      }).select().single();
+      if (error) throw error;
+      setSyncStatus('synced');
+      return dbToLog(data);
+    } catch (err) {
+      console.error('Insert log error:', err);
+      setSyncStatus('error');
+      showToast('完了保存エラー: ' + err.message);
+      return null;
+    }
+  }
+
+  async function dbDeleteLog(logId) {
+    setSyncStatus('syncing');
+    try {
+      const { error } = await db.from('logs').delete().eq('id', logId);
+      if (error) throw error;
+      setSyncStatus('synced');
+      return true;
+    } catch (err) {
+      console.error('Delete log error:', err);
+      setSyncStatus('error');
+      showToast('ログ削除エラー: ' + err.message);
+      return false;
+    }
+  }
+
+  async function dbDeleteAllLogs() {
+    setSyncStatus('syncing');
+    try {
+      const { error } = await db.from('logs').delete().eq('user_id', currentUser.id);
+      if (error) throw error;
+      setSyncStatus('synced');
+      return true;
+    } catch (err) {
+      console.error('Clear logs error:', err);
+      setSyncStatus('error');
+      showToast('クリアエラー: ' + err.message);
+      return false;
+    }
   }
 
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -817,7 +1397,6 @@
     document.getElementById('logBadge').textContent = `[ ${logs.length} ]`;
 
     renderCalendar();
-    saveData();
   }
 
   function renderCalendar() {
@@ -941,7 +1520,7 @@
     renderCalendar();
   }
 
-  function addTask() {
+  async function addTask() {
     const input = document.getElementById('taskInput');
     const startInput = document.getElementById('startDateInput');
     const endInput = document.getElementById('endDateInput');
@@ -953,76 +1532,100 @@
     let startDate = startInput.value || null;
     let endDate = endInput.value || null;
 
-    // If only one date is entered, use it for both
     if (startDate && !endDate) endDate = startDate;
     if (!startDate && endDate) startDate = endDate;
 
-    // Validate: start should not be after end
     if (startDate && endDate && startDate > endDate) {
       showToast('開始日が終了日より後になっています');
       return;
     }
 
-    tasks.unshift({
-      text, created: Date.now(),
+    const newTask = {
+      text,
       startDate: startDate,
       endDate: endDate,
       priority: parseInt(priorityInput.value) || 2,
       private: privateInput.checked
-    });
-    input.value = '';
-    startInput.value = '';
-    endInput.value = '';
-    priorityInput.value = '2';
-    privateInput.checked = false;
-    document.getElementById('privateToggle').classList.remove('active');
-    render();
+    };
+
+    const saved = await dbInsertTask(newTask);
+    if (saved) {
+      tasks.unshift(saved);
+      input.value = '';
+      startInput.value = '';
+      endInput.value = '';
+      priorityInput.value = '2';
+      privateInput.checked = false;
+      document.getElementById('privateToggle').classList.remove('active');
+      render();
+    }
   }
 
-  function completeTask(idx) {
+  async function completeTask(idx) {
     const checkboxes = document.querySelectorAll('.checkbox');
     let checkbox = null;
     checkboxes.forEach(cb => { if (parseInt(cb.dataset.idx) === idx) checkbox = cb; });
     if (checkbox) checkbox.classList.add('checked');
-    setTimeout(() => {
-      const task = tasks.splice(idx, 1)[0];
-      if (task) {
-        logs.unshift({
-          text: task.text,
-          startDate: task.startDate,
-          endDate: task.endDate,
-          priority: task.priority,
-          private: task.private || false,
-          created: task.created,
-          completed: Date.now()
-        });
-        render();
+
+    const task = tasks[idx];
+    if (!task) return;
+
+    setTimeout(async () => {
+      // Insert into logs first, then delete from tasks
+      const logRow = await dbInsertLog(task);
+      if (logRow) {
+        const deleted = await dbDeleteTask(task.id);
+        if (deleted) {
+          tasks.splice(idx, 1);
+          logs.unshift(logRow);
+          render();
+        }
       }
     }, 280);
   }
 
-  function deleteTask(idx) { tasks.splice(idx, 1); render(); }
+  async function deleteTask(idx) {
+    const task = tasks[idx];
+    if (!task) return;
+    const ok = await dbDeleteTask(task.id);
+    if (ok) {
+      tasks.splice(idx, 1);
+      render();
+    }
+  }
 
-  function deleteLog(idx) {
-    if (confirm('このログを完全に削除しますか?')) {
+  async function deleteLog(idx) {
+    if (!confirm('このログを完全に削除しますか?')) return;
+    const log = logs[idx];
+    if (!log) return;
+    const ok = await dbDeleteLog(log.id);
+    if (ok) {
       logs.splice(idx, 1);
       render();
     }
   }
 
-  function cyclePriority(idx) {
+  async function cyclePriority(idx) {
     const t = tasks[idx];
     if (!t) return;
     const current = t.priority || 2;
-    t.priority = current === 2 ? 1 : current === 1 ? 3 : 2;
-    render();
+    const newPriority = current === 2 ? 1 : current === 1 ? 3 : 2;
+    const ok = await dbUpdateTask(t.id, { priority: newPriority });
+    if (ok) {
+      t.priority = newPriority;
+      render();
+    }
   }
 
-  function togglePrivate(idx) {
+  async function togglePrivate(idx) {
     const t = tasks[idx];
     if (!t) return;
-    t.private = !t.private;
-    render();
+    const newPrivate = !t.private;
+    const ok = await dbUpdateTask(t.id, { private: newPrivate });
+    if (ok) {
+      t.private = newPrivate;
+      render();
+    }
   }
 
   function editTask(idx) {
@@ -1038,12 +1641,19 @@
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    const finish = () => {
+    const finish = async () => {
       span.contentEditable = 'false';
       const newText = span.textContent.trim();
-      if (newText) tasks[idx].text = newText;
-      else tasks.splice(idx, 1);
-      render();
+      const t = tasks[idx];
+      if (!t) return;
+      if (newText && newText !== t.text) {
+        const ok = await dbUpdateTask(t.id, { text: newText });
+        if (ok) { t.text = newText; render(); }
+        else { span.textContent = original; }
+      } else if (!newText) {
+        const ok = await dbDeleteTask(t.id);
+        if (ok) { tasks.splice(idx, 1); render(); }
+      }
     };
     span.addEventListener('blur', finish, { once: true });
     span.addEventListener('keydown', (e) => {
@@ -1057,18 +1667,24 @@
     if (url) window.open(url, '_blank');
   }
 
-  function restoreLog(idx) {
-    const log = logs.splice(idx, 1)[0];
-    if (log) {
-      tasks.unshift({
-        text: log.text,
-        created: Date.now(),
-        startDate: log.startDate || null,
-        endDate: log.endDate || null,
-        priority: log.priority || 2,
-        private: log.private || false
-      });
-      render();
+  async function restoreLog(idx) {
+    const log = logs[idx];
+    if (!log) return;
+    const newTask = {
+      text: log.text,
+      startDate: log.startDate || null,
+      endDate: log.endDate || null,
+      priority: log.priority || 2,
+      private: log.private || false
+    };
+    const inserted = await dbInsertTask(newTask);
+    if (inserted) {
+      const ok = await dbDeleteLog(log.id);
+      if (ok) {
+        logs.splice(idx, 1);
+        tasks.unshift(inserted);
+        render();
+      }
     }
   }
 
@@ -1271,9 +1887,12 @@
     else if (action === 'log-delete') deleteLog(idx);
   });
 
-  document.getElementById('clearLogBtn').addEventListener('click', () => {
+  document.getElementById('clearLogBtn').addEventListener('click', async () => {
     if (logs.length === 0) return;
-    if (confirm('完了ログをすべて削除しますか?')) { logs = []; render(); }
+    if (confirm('完了ログをすべて削除しますか?')) {
+      const ok = await dbDeleteAllLogs();
+      if (ok) { logs = []; render(); }
+    }
   });
 
   document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -1323,15 +1942,30 @@
     document.getElementById('clock').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
-  loadData();
-  const now = new Date();
-  calYear = now.getFullYear();
-  calMonth = now.getMonth();
-  document.getElementById('endDateInput').value = `${calYear}-${pad(calMonth+1)}-${pad(now.getDate())}`;
-  render();
-  updateClock();
-  setInterval(updateClock, 1000);
-  setInterval(render, 60000);
+  // ============================================
+  // LOGIN/LOGOUT EVENT BINDINGS
+  // ============================================
+  document.getElementById('sendMagicBtn').addEventListener('click', sendMagicLink);
+  document.getElementById('emailInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMagicLink();
+  });
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+
+  // Listen for auth state changes (e.g. magic link clicked)
+  db.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session && !currentUser) {
+      currentUser = session.user;
+      onAuthSuccess();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      showLoginScreen();
+    }
+  });
+
+  // ============================================
+  // INITIAL AUTH CHECK
+  // ============================================
+  checkAuth();
 </script>
 
 </body>
