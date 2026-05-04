@@ -1,0 +1,34 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # 6日ごとに実行(UTC 0:00)
+    # cronは 分 時 日 月 曜日 の順
+    # */6 で6日ごと
+    - cron: '0 0 */6 * *'
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase to keep project alive
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/tasks?limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          
+          echo "HTTP Status: $response"
+          
+          if [ "$response" -eq 200 ] || [ "$response" -eq 401 ]; then
+            echo "✅ Supabase project is alive (status: $response)"
+            exit 0
+          else
+            echo "❌ Unexpected status: $response"
+            exit 1
+          fi
+
+      - name: Log timestamp
+        run: |
+          echo "Pinged Supabase at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
